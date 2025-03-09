@@ -50,9 +50,14 @@ contract DSCEngine is ReentrancyGuard {
     error DSCEngine_TokenAddressesAndPriceFeedAddressesMustBeSameLength();
     error DSCEngine_InvalidToken();
     error DSCEngine_TransferFailed();
+    error DSCEngine_BreaksHealthFactor(uint256 healthFactor);
+    error DSCEngine_MintFailed();
 
+    uint256 private constant LIQUIDATION_THRESHOLD = 50; //200% collateral
     uint256 private constant ADDITIONAL_FEED_PRECISION = 1e10;
     uint256 private constant PRECISION = 1e18;
+    uint256 private constant LIQUIDATION_PRECISION = 100;
+    uint256 private constant MIN_HEALTH_FACTOR = 1;
 
     mapping(address token => address priceFeed) private s_priceFeeds; //token -> pricefeeds
     mapping(address user => mapping(address token => uint256 amount)) private s_collateralDeposited;
@@ -123,6 +128,10 @@ contract DSCEngine is ReentrancyGuard {
     function mintDsc(uint256 amountDscToMint) external moreThanZero(amountDscToMint) nonReentrant{
         s_DscMinted[msg.sender] += amountDscToMint;
         _revertIfHealthFactorisBroken(msg.sender);
+        bool minted = i_dsc.mint(msg.sender, amountDscToMint);
+        if(!minted){
+            revert DSCEngine_MintFailed();
+        }
     }
 
     function redeemCollateral() external {}
@@ -145,12 +154,19 @@ contract DSCEngine is ReentrancyGuard {
         collateralValueInUsd = getAmountCollateralValue(user);
     }
 
-    function _healthFactor(address user) private view{
+    function _healthFactor(address user) private view returns(uint256){
         (uint256 totalDscMinted, uint256 collateralValueInUsd) = _getAccountInformation(user);
+        uint256 collateralAdjustedForThreshold = (collateralValueInUsd * LIQUIDATION_THRESHOLD)/LIQUIDATION_PRECISION;
+        return(collateralAdjustedForThreshold*PRECISION)/ totalDscMinted;
+
+
     }
 
     function _revertIfHealthFactorisBroken(address user) internal view {
-
+        uint256 userHealthFactor = _healthFactor(user);
+        if(userHealthFactor > MIN_HEALTH_FACTOR){
+            revert DSCEngine_BreaksHealthFactor(userHealthFactor);
+        }
     }
 
     /////////////////////// PUBLIC & EXTERNAL VIEW FUNCTIONS//////////////////
