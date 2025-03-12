@@ -8,15 +8,25 @@ import {DSCEngine} from "../src/DSCEngine.sol";
 import {HelperConfig} from "./HelperConfig.sol";
 
 contract DeployDSC is Script {
-    function run() external returns (DecentralizedStableCoin, DSCEngine) {
-        HelperCOnfig config = new HelperConfig();
+
+    address[] public tokenAddresses;
+    address[] public priceFeedAddresses;
+
+    function run() external returns (DecentralizedStableCoin, DSCEngine, HelperConfig) {
+        HelperConfig config = new HelperConfig();
 
         (address wethUsdPriceFeed, address wbtcUsdPriceFeed, address weth, address wbtc, uint256 deployerKey) =
             config.activeNetworkConfig();
-            
-        vm.startBroadcast();
+
+        tokenAddresses = [weth, wbtc];
+        priceFeedAddresses = [wethUsdPriceFeed, wbtcUsdPriceFeed];
+
+        vm.startBroadcast(deployerKey);
         DecentralizedStableCoin dsc = new DecentralizedStableCoin();
-        DSCEngine engine = new DSCEngine();
+        DSCEngine engine = new DSCEngine(tokenAddresses, priceFeedAddresses, address(dsc));
+
+        dsc.transferOwnership(address (engine));
         vm.stopBroadcast();
+        return (dsc, engine,config);
     }
 }
