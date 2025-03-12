@@ -43,7 +43,7 @@ contract DecentralizedStableCoin is ERC20Burnable, Ownable {
 
     //0x87 is a mock address just to avoid error for now. Later put DSC engine contract address
 
-    constructor() ERC20("DecentralizedStableCoin", "DSC") Ownable(address(0x87)) {}
+    constructor() ERC20("DecentralizedStableCoin", "DSC") {}
 
     function burn(uint256 _amount) public override onlyOwner {
         uint256 balance = balanceOf(msg.sender);
