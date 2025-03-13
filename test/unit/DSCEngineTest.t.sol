@@ -6,10 +6,10 @@ import {Test} from "forge-std/Test.sol";
 import {DeployDSC} from "../../script/DeployDSC.s.sol";
 import {DecentralizedStableCoin} from "../../src/DecentralizedStableCoin.sol";
 import {DSCEngine} from "../../src/DSCEngine.sol";
-import { HelperConfig } from "../../script/HelperConfig.sol";
-import { ERC20Mock } from "@openzeppelin/contracts/mocks/ERC20Mock.sol";
+import {HelperConfig} from "../../script/HelperConfig.sol";
+import {ERC20Mock} from "@openzeppelin/contracts/mocks/ERC20Mock.sol";
 
-contract DSCEngineTest is Test{
+contract DSCEngineTest is Test {
     DeployDSC deployer;
     DecentralizedStableCoin dsc;
     DSCEngine dscE;
@@ -21,17 +21,15 @@ contract DSCEngineTest is Test{
     uint256 public constant AMOUNT_COLLATERAL = 10 ether;
     uint256 public constant STARTING_ERC20_BALANCE = 10 ether;
 
-    function setUp() public{
+    function setUp() public {
         deployer = new DeployDSC();
-        (dsc,dscE,config) = deployer.run();
-        (ethUsdPriceFeed,,weth,,) = config.activeNetworkConfig();
+        (dsc, dscE, config) = deployer.run();
+        (ethUsdPriceFeed,, weth,,) = config.activeNetworkConfig();
 
         ERC20Mock(weth).mint(USER, STARTING_ERC20_BALANCE);
     }
 
-
     ////////////////PRICE TESTS////////////////
-
 
     function testGetUsdValue() public {
         uint256 ethAmount = 15e18;
@@ -41,9 +39,9 @@ contract DSCEngineTest is Test{
         assertEq(usdValue, expectedUsd);
     }
 
-    /////////////// DEPOSITCOLLATERAL TESTS////////// 
+    /////////////// DEPOSITCOLLATERAL TESTS//////////
 
-     function testRevertsIfCollateralZero() public {
+    function testRevertsIfCollateralZero() public {
         vm.startPrank(USER);
         ERC20Mock(weth).approve(address(dscE), AMOUNT_COLLATERAL);
 
@@ -51,6 +49,4 @@ contract DSCEngineTest is Test{
         dscE.depositCollateral(weth, 0);
         vm.stopPrank();
     }
-
-
 }
