@@ -88,10 +88,10 @@ contract DSCEngineTest is Test {
         _;
     }
 
-    function testCanDepositedCollateralAndGetAccountInfo() public depositedCollateral {
-        (uint256 totalDscMinted, uint256 collateralValueInUsd) = dsce.getAccountInformation(user);
-        uint256 expectedDepositedAmount = dsce.getTokenAmountFromUsd(weth, collateralValueInUsd);
+    function testCanDepositedCollateralAndGetAccountInfo() public depositCollateral {
+        (uint256 totalDscMinted, uint256 collateralValueInUsd) = dscE.getAccountInformation(user);
+        uint256 expectedDepositedAmount = dscE.getTokenAmountFromUsd(weth, collateralValueInUsd);
         assertEq(totalDscMinted, 0);
-        assertEq(expectedDepositedAmount, amountCollateral);
+        assertEq(expectedDepositedAmount, AMOUNT_COLLATERAL);
     }
 }
