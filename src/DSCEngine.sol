@@ -52,6 +52,7 @@ contract DSCEngine is ReentrancyGuard {
     error DSCEngine_BreaksHealthFactor(uint256 healthFactor);
     error DSCEngine_MintFailed();
     error DSCEngine_HealthFactorOk();
+    error DSCEngine__HealthFactorNotImproved();
 
     uint256 private constant LIQUIDATION_THRESHOLD = 50; //200% collateral
     uint256 private constant ADDITIONAL_FEED_PRECISION = 1e10;
@@ -69,7 +70,7 @@ contract DSCEngine is ReentrancyGuard {
     DecentralizedStableCoin private immutable i_dsc;
 
     event CollateralDeposited(address indexed user, address indexed token, uint256 amount);
-    event CollateralReedeemed(address indexed user ,address indexed token, uint256 indexed amount);
+    event CollateralReedeemed(address indexed redeemedFrom ,address indexed redeemedTo, address indexed token, uint256 amount);
 
     modifier moreThanZero(uint256 _amount) {
         if (_amount <= 0) {
@@ -147,12 +148,7 @@ contract DSCEngine is ReentrancyGuard {
     }
 
     function burnDSC(uint256 amount) public moreThanZero(amount){
-        s_DscMinted[msg.sender] -= amount;
-        bool success = i_dsc.transferFrom(msg.sender,address(this), amount);
-        if(!success){
-            revert DSCEngine_TransferFailed();
-        }
-        i_dsc.burn(amount);
+        _burnDsc(amount, msg.sender, msg.sender);
         _revertIfHealthFactorisBroken(msg.sender); // Not needed essentially as debt is being cleared
     }
 
@@ -173,13 +169,7 @@ contract DSCEngine is ReentrancyGuard {
     // Conditions to redeem collateral
     // 1. Health factor must be over 1 after collateral pulled
     function redeemCollateral(address tokenCollateralAddress, uint256 amountCollateral) public moreThanZero(amountCollateral) nonReentrant{
-        s_collateralDeposited[msg.sender][tokenCollateralAddress] -= amountCollateral;
-        emit CollateralReedeemed(msg.sender,tokenCollateralAddress,amountCollateral);
-
-        bool success = IERC20(tokenCollateralAddress).transfer(msg.sender,amountCollateral);
-        if(!success){
-            revert DSCEngine_TransferFailed();
-        }
+        _redeemCollateral(msg.sender, msg.sender, tokenCollateralAddress, amountCollateral);
         _revertIfHealthFactorisBroken(msg.sender);
 
     }
@@ -204,6 +194,16 @@ contract DSCEngine is ReentrancyGuard {
         uint256 tokenamountFromDebtCovered = getTokenAmountFromUsd(collateral, debtToCover); 
         uint256 bonusCollateral = (tokenamountFromDebtCovered*LIQUIDATION_BONUS)/LIQUIDATION_PRECISION;
         uint256 totalCollateralToRedeem = tokenamountFromDebtCovered + bonusCollateral;
+        _redeemCollateral(user, msg.sender,collateral, totalCollateralToRedeem);
+        _burnDsc(debtToCover, user, msg.sender);
+
+                uint256 endingUserHealthFactor = _healthFactor(user);
+        // This conditional should never hit, but just in case
+        if (endingUserHealthFactor <= startingUserHealthFactor) {
+            revert DSCEngine__HealthFactorNotImproved();
+        }
+        _revertIfHealthFactorIsBroken(msg.sender);
+
     }
 
     function _getHealthFactor() external view {}
@@ -234,6 +234,26 @@ contract DSCEngine is ReentrancyGuard {
         if (userHealthFactor > MIN_HEALTH_FACTOR) {
             revert DSCEngine_BreaksHealthFactor(userHealthFactor);
         }
+    }
+
+    function _redeemCollateral( address from, address to,address tokenCollateralAddress,uint256 amountCollateral) private {
+         s_collateralDeposited[from][tokenCollateralAddress] -= amountCollateral;
+        emit CollateralReedeemed(from,to,tokenCollateralAddress,amountCollateral);
+
+        bool success = IERC20(tokenCollateralAddress).transfer(to,amountCollateral);
+        if(!success){
+            revert DSCEngine_TransferFailed();
+        }
+    }
+
+    function _burnDsc(uint256 amountDscToBurn, address onBehalfOf, address dscFrom) private {
+        s_DscMinted[onBehalfOf] -= amountDscToBurn;
+        bool success = i_dsc.transferFrom(dscFrom,address(this), amountDscToBurn);
+        if(!success){
+            revert DSCEngine_TransferFailed();
+        }
+        i_dsc.burn(amountDscToBurn);
+        
     }
 
     /////////////////////// PUBLIC & EXTERNAL VIEW FUNCTIONS//////////////////
